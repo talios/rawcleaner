@@ -32,7 +32,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+	s := spinner.New(spinner.CharSets[9], 1024*time.Millisecond)
 	s.Start()
 
 	if deleteFiles {
@@ -41,7 +41,7 @@ func main() {
 
 	fsys := os.DirFS(basePath)
 
-	log.Println("Looking for FUJI raw files in " + basePath)
+	log.Println("Looking for Fuji raw files in " + basePath)
 
 	var count int
 
@@ -67,18 +67,21 @@ func main() {
 
 func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []string {
 	found := []string{}
-	// change file extention
-	filename = strings.TrimRight(filename, filepath.Ext(filename))
 
-	matches, err := filepath.Glob(path + "/" + filename + "*")
+	globPattern := fmt.Sprintf("%s/%s*", path, strings.TrimRight(filename, filepath.Ext(filename)))
+
+	matches, err := filepath.Glob(globPattern)
 	if err != nil {
 		fmt.Println(err)
 	}
-	for _, match := range matches {
-		if strings.ToLower(filepath.Ext(match)) == ".jpg" {
-			found = append(found, match)
+	for _, sideCarFilePath := range matches {
+		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
+			found = append(found, sideCarFilePath)
 			spinner.Suffix = fmt.Sprintf("  : Found %d duplicates", len(found))
-			removeSideCar(match)
+			if verboseMode || veryVerboseMode {
+				log.Printf("Found duplicate %s\n", sideCarFilePath)
+			}
+			removeSideCar(sideCarFilePath)
 		}
 	}
 	return found
@@ -86,9 +89,6 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 
 func removeSideCar(sideCarFilePath string) {
 	if file, err := os.Stat(sideCarFilePath); err == nil {
-		if verboseMode || veryVerboseMode {
-			log.Printf("Found duplicate %s\n", sideCarFilePath)
-		}
 		savedSize += file.Size()
 		if deleteFiles {
 			log.Printf("Removing duplicate %s\n", sideCarFilePath)
