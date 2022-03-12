@@ -18,7 +18,7 @@ var deleteFiles bool
 var verboseMode bool
 var veryVerboseMode bool
 var basePath string
-var savedSize int64 = 0
+var savedSize int64
 
 func init() {
 	defaultPath := fmt.Sprintf("/Users/%s/Pictures", os.Getenv("USER"))
@@ -44,21 +44,19 @@ func main() {
 	log.Println("Looking for FUJI raw files in " + basePath)
 
 	var count int
-	extensions := []string{"JPG", "jpg"}
 
-	fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if strings.HasSuffix(strings.ToLower(filepath.Ext(p)), ".raf") {
+	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if filepath.Ext(p) == ".raf" || filepath.Ext(p) == ".RAF" {
 			if veryVerboseMode {
 				log.Printf("Found %s/%s/%s\n", basePath, p, d.Name())
 			}
-			for _, ext := range extensions {
-				findSideCar(basePath, p, ext)
-			}
-
+			findSideCar(basePath, p)
 			count++
 		}
 		return nil
-	})
+	}); err != nil {
+		log.Printf("Walkdir returned error %v", err)
+	}
 
 	s.Stop()
 
@@ -67,20 +65,27 @@ func main() {
 
 }
 
-func findSideCar(path string, p string, requestedExt string) string {
-	sideCarFile := p[0:len(p)-3] + requestedExt
-	sideCarFilePath := path + "/" + sideCarFile
-	if file, err := os.Stat(sideCarFilePath); err == nil {
-		if verboseMode || veryVerboseMode {
-			log.Printf("Found duplicate %s %s\n", requestedExt, sideCarFilePath)
-		}
-		savedSize += file.Size()
-		if deleteFiles {
-			log.Printf("Removing duplicate %s %s\n", requestedExt, sideCarFilePath)
-			if err := os.Remove(sideCarFilePath); err != nil {
-				log.Fatal(err)
+func findSideCar(path string, filename string) []string {
+	extensions := []string{"JPG", "jpg"}
+	found := []string{}
+	// change file extention
+	filename = strings.TrimRight(filename, filepath.Ext(filename))
+	for _, ext := range extensions {
+		sideCarFile := filename + "." + ext
+		sideCarFilePath := path + "/" + sideCarFile
+		if file, err := os.Stat(sideCarFilePath); err == nil {
+			found = append(found, sideCarFilePath)
+			if verboseMode || veryVerboseMode {
+				log.Printf("Found duplicate %s %s: %s\n", ext, sideCarFilePath, file.Name())
+			}
+			savedSize += file.Size()
+			if deleteFiles {
+				log.Printf("Removing duplicate %s %s\n", ext, sideCarFilePath)
+				if err := os.Remove(sideCarFilePath); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
-	return sideCarFilePath
+	return found
 }
