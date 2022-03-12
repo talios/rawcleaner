@@ -32,6 +32,10 @@ func init() {
 func main() {
 	flag.Parse()
 
+	if !strings.HasSuffix(basePath, "/") {
+		basePath = basePath + "/"
+	}
+
 	s := spinner.New(spinner.CharSets[9], 1024*time.Millisecond)
 	s.Start()
 
@@ -48,7 +52,7 @@ func main() {
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if strings.ToLower(filepath.Ext(p)) == ".raf" {
 			if veryVerboseMode {
-				log.Printf("Found %s/%s/%s\n", basePath, p, d.Name())
+				log.Printf("Found %s%s\n", basePath, p)
 			}
 			findSideCarFiles(s, basePath, p)
 			count++
@@ -78,9 +82,6 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
 			found = append(found, sideCarFilePath)
 			spinner.Suffix = fmt.Sprintf("  : Found %d duplicates", len(found))
-			if verboseMode || veryVerboseMode {
-				log.Printf("Found duplicate %s\n", sideCarFilePath)
-			}
 			removeSideCar(sideCarFilePath)
 		}
 	}
@@ -94,6 +95,10 @@ func removeSideCar(sideCarFilePath string) {
 			log.Printf("Removing duplicate %s\n", sideCarFilePath)
 			if err := os.Remove(sideCarFilePath); err != nil {
 				log.Fatal(err)
+			}
+		} else {
+			if verboseMode || veryVerboseMode {
+				log.Printf("Found duplicate %s\n", sideCarFilePath)
 			}
 		}
 	}
