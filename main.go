@@ -46,7 +46,7 @@ func main() {
 	var count int
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if filepath.Ext(p) == ".raf" || filepath.Ext(p) == ".RAF" {
+		if strings.ToLower(filepath.Ext(p)) == ".raf" {
 			if veryVerboseMode {
 				log.Printf("Found %s/%s/%s\n", basePath, p, d.Name())
 			}
