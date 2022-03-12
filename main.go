@@ -66,26 +66,35 @@ func main() {
 }
 
 func findSideCar(path string, filename string) []string {
-	extensions := []string{"JPG", "jpg"}
 	found := []string{}
 	// change file extention
 	filename = strings.TrimRight(filename, filepath.Ext(filename))
-	for _, ext := range extensions {
-		sideCarFile := filename + "." + ext
-		sideCarFilePath := path + "/" + sideCarFile
-		if file, err := os.Stat(sideCarFilePath); err == nil {
-			found = append(found, sideCarFilePath)
-			if verboseMode || veryVerboseMode {
-				log.Printf("Found duplicate %s %s: %s\n", ext, sideCarFilePath, file.Name())
-			}
-			savedSize += file.Size()
-			if deleteFiles {
-				log.Printf("Removing duplicate %s %s\n", ext, sideCarFilePath)
-				if err := os.Remove(sideCarFilePath); err != nil {
-					log.Fatal(err)
-				}
-			}
+
+	matches, err := filepath.Glob(path + "/" + filename + "*")
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, match := range matches {
+		if strings.ToLower(filepath.Ext(match)) == ".jpg" {
+			found = append(found, match)
+			removeSideCar(match)
 		}
 	}
 	return found
+}
+
+func removeSideCar(sideCarFilePath string) {
+
+	if file, err := os.Stat(sideCarFilePath); err == nil {
+		if verboseMode || veryVerboseMode {
+			log.Printf("Found duplicate %s\n", sideCarFilePath)
+		}
+		savedSize += file.Size()
+		if deleteFiles {
+			log.Printf("Removing duplicate %s\n", sideCarFilePath)
+			if err := os.Remove(sideCarFilePath); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 }
