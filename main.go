@@ -50,7 +50,7 @@ func main() {
 			if veryVerboseMode {
 				log.Printf("Found %s/%s/%s\n", basePath, p, d.Name())
 			}
-			findSideCar(basePath, p)
+			findSideCarFiles(s, basePath, p)
 			count++
 		}
 		return nil
@@ -65,7 +65,7 @@ func main() {
 
 }
 
-func findSideCar(path string, filename string) []string {
+func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []string {
 	found := []string{}
 	// change file extention
 	filename = strings.TrimRight(filename, filepath.Ext(filename))
@@ -77,6 +77,7 @@ func findSideCar(path string, filename string) []string {
 	for _, match := range matches {
 		if strings.ToLower(filepath.Ext(match)) == ".jpg" {
 			found = append(found, match)
+			spinner.Suffix = fmt.Sprintf("  : Found %d duplicates", len(found))
 			removeSideCar(match)
 		}
 	}
@@ -84,7 +85,6 @@ func findSideCar(path string, filename string) []string {
 }
 
 func removeSideCar(sideCarFilePath string) {
-
 	if file, err := os.Stat(sideCarFilePath); err == nil {
 		if verboseMode || veryVerboseMode {
 			log.Printf("Found duplicate %s\n", sideCarFilePath)
