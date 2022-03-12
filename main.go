@@ -6,9 +6,11 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/dustin/go-humanize"
 	"path/filepath"
 )
 
@@ -45,7 +47,7 @@ func main() {
 	extensions := []string{"JPG", "jpg"}
 
 	fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if filepath.Ext(p) == ".raf" || filepath.Ext(p) == ".RAF" {
+		if strings.HasSuffix(strings.ToLower(filepath.Ext(p)), ".raf") {
 			if veryVerboseMode {
 				log.Printf("Found %s/%s/%s\n", basePath, p, d.Name())
 			}
@@ -60,7 +62,7 @@ func main() {
 
 	s.Stop()
 
-	log.Printf("Saved %d bytes.\n", savedSize)
+	log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
 	log.Printf("Found %d files.\n", count)
 
 }
