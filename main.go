@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,7 +22,8 @@ var basePath string
 var savedSize int64
 
 func init() {
-	defaultPath := fmt.Sprintf("/Users/%s/Pictures", os.Getenv("USER"))
+	usr, _ := user.Current()
+	defaultPath := usr.HomeDir + "/Pictures"
 
 	flag.BoolVar(&deleteFiles, "delete", false, "actually delete the side car files")
 	flag.BoolVar(&verboseMode, "v", false, "run in verbose mode")
