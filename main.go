@@ -71,7 +71,13 @@ func main() {
 		removeSideCar(found)
 	}
 
-	log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
+	if len(allFound) > 0 {
+		if deleteFiles {
+			log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
+		} else {
+			log.Printf("Run with -delete to save %s bytes.\n", humanize.Bytes(uint64(savedSize)))
+		}
+	}
 
 	s.Stop()
 
