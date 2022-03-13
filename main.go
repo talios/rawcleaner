@@ -49,7 +49,7 @@ func main() {
 
 	log.Println("Looking for Fuji raw files in " + basePath)
 
-	var count int
+	allFound := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if strings.ToLower(filepath.Ext(p)) == ".raf" {
@@ -57,18 +57,23 @@ func main() {
 				log.Printf("Found %s%s\n", basePath, p)
 			}
 			found := findSideCarFiles(s, basePath, p)
-			count = count + len(found)
-			s.Suffix = fmt.Sprintf("  : Found %d duplicates totalling %s", count, humanize.Bytes(uint64(savedSize)))
+			allFound = append(allFound, found...)
+			s.Suffix = fmt.Sprintf("  : Found %d duplicates totalling %s", len(allFound), humanize.Bytes(uint64(savedSize)))
 		}
 		return nil
 	}); err != nil {
 		log.Printf("Walkdir returned error %v", err)
 	}
 
-	s.Stop()
+	log.Printf("Found %d duplicate files.\n", len(allFound))
+
+	for _, found := range allFound {
+		removeSideCar(found)
+	}
 
 	log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
-	log.Printf("Found %d files.\n", count)
+
+	s.Stop()
 
 }
 
@@ -84,7 +89,6 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 	for _, sideCarFilePath := range matches {
 		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
 			found = append(found, sideCarFilePath)
-			removeSideCar(sideCarFilePath)
 		}
 	}
 	return found
