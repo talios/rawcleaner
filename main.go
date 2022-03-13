@@ -6,12 +6,12 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/dustin/go-humanize"
-	"path/filepath"
 )
 
 var deleteFiles bool
@@ -56,7 +56,7 @@ func main() {
 			}
 			found := findSideCarFiles(s, basePath, p)
 			count = count + len(found)
-			s.Suffix = fmt.Sprintf("  : Found %d duplicates", count)
+			s.Suffix = fmt.Sprintf("  : Found %d duplicates totalling %s", count, humanize.Bytes(uint64(savedSize)))
 		}
 		return nil
 	}); err != nil {
