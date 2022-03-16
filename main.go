@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,12 +48,12 @@ func main() {
 
 	fsys := os.DirFS(basePath)
 
-	log.Println("Looking for Fuji raw files in " + basePath)
+	log.Println("Looking for raw files in " + basePath)
 
 	allFound := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if strings.ToLower(filepath.Ext(p)) == ".raf" {
+		if IsRawFile(p) {
 			if veryVerboseMode {
 				log.Printf("Found %s%s\n", basePath, p)
 			}
@@ -81,6 +82,11 @@ func main() {
 
 	s.Stop()
 
+}
+
+func IsRawFile(filename string) bool {
+	match, _ := regexp.MatchString("\\.(raf|dmg)", strings.ToLower(filename))
+	return match
 }
 
 func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []string {
