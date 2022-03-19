@@ -19,6 +19,7 @@ import (
 var deleteFiles bool
 var verboseMode bool
 var veryVerboseMode bool
+var runInline bool
 var basePath string
 var savedSize int64
 
@@ -29,6 +30,7 @@ func init() {
 	flag.BoolVar(&deleteFiles, "delete", false, "actually delete the side car files")
 	flag.BoolVar(&verboseMode, "v", false, "run in verbose mode")
 	flag.BoolVar(&veryVerboseMode, "vv", false, "run in very verbose mode")
+	flag.BoolVar(&runInline, "inline", false, "run deletion process as we scan")
 	flag.StringVar(&basePath, "path", defaultPath, "base path to check")
 }
 
@@ -68,8 +70,10 @@ func main() {
 
 	log.Printf("Found %d duplicate files.\n", len(allFound))
 
-	for _, found := range allFound {
-		removeSideCar(found)
+	if !runInline {
+		for _, found := range allFound {
+			removeSideCar(found)
+		}
 	}
 
 	if len(allFound) > 0 {
@@ -101,6 +105,9 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 	for _, sideCarFilePath := range matches {
 		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
 			found = append(found, sideCarFilePath)
+			if runInline {
+				removeSideCar(sideCarFilePath)
+			}
 		}
 	}
 	return found
