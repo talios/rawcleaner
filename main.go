@@ -47,7 +47,7 @@ func main() {
 	allFound := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if IsRawFile(p) {
+		if isRawFile(p) {
 			if *veryVerboseMode {
 				log.Printf("Found %s%s\n", *basePath, p)
 			}
@@ -80,7 +80,7 @@ func main() {
 
 }
 
-func IsRawFile(filename string) bool {
+func isRawFile(filename string) bool {
 	match, _ := regexp.MatchString("\\.(raf|dmg)", strings.ToLower(filename))
 	return match
 }
