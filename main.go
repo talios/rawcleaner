@@ -1,12 +1,10 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/fs"
 	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,52 +12,45 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/dustin/go-humanize"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-var deleteFiles bool
-var verboseMode bool
-var veryVerboseMode bool
-var runInline bool
-var basePath string
-var savedSize int64
+var (
+	deleteFiles     = kingpin.Flag("delete", "Actually delete the side car files.").Bool()
+	verboseMode     = kingpin.Flag("verbose", "Run in verbose mode.").Short('v').Bool()
+	veryVerboseMode = kingpin.Flag("very-verbose", "Run in VERY verbose mode.").Bool()
+	runInline       = kingpin.Flag("inline", "Run deletion process as we scan.").Bool()
+	basePath        = kingpin.Arg("path", "Base path to scan.").Required().String()
 
-func init() {
-	usr, _ := user.Current()
-	defaultPath := usr.HomeDir + "/Pictures"
-
-	flag.BoolVar(&deleteFiles, "delete", false, "actually delete the side car files")
-	flag.BoolVar(&verboseMode, "v", false, "run in verbose mode")
-	flag.BoolVar(&veryVerboseMode, "vv", false, "run in very verbose mode")
-	flag.BoolVar(&runInline, "inline", false, "run deletion process as we scan")
-	flag.StringVar(&basePath, "path", defaultPath, "base path to check")
-}
+	savedSize int64
+)
 
 func main() {
-	flag.Parse()
+	kingpin.Parse()
 
-	if !strings.HasSuffix(basePath, "/") {
-		basePath = basePath + "/"
+	if !strings.HasSuffix(*basePath, "/") {
+		*basePath = *basePath + "/"
 	}
 
 	s := spinner.New(spinner.CharSets[9], 1024*time.Millisecond)
 	s.Start()
 
-	if deleteFiles {
+	if *deleteFiles {
 		log.Println("WARN: raw-cleaner will delete files")
 	}
 
-	fsys := os.DirFS(basePath)
+	fsys := os.DirFS(*basePath)
 
-	log.Println("Looking for raw files in " + basePath)
+	log.Println("Looking for raw files in " + *basePath)
 
 	allFound := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if IsRawFile(p) {
-			if veryVerboseMode {
-				log.Printf("Found %s%s\n", basePath, p)
+			if *veryVerboseMode {
+				log.Printf("Found %s%s\n", *basePath, p)
 			}
-			found := findSideCarFiles(s, basePath, p)
+			found := findSideCarFiles(s, *basePath, p)
 			allFound = append(allFound, found...)
 			s.Suffix = fmt.Sprintf("  : Found %d duplicates totalling %s", len(allFound), humanize.Bytes(uint64(savedSize)))
 		}
@@ -70,14 +61,14 @@ func main() {
 
 	log.Printf("Found %d duplicate files.\n", len(allFound))
 
-	if !runInline {
+	if !*runInline {
 		for _, found := range allFound {
 			removeSideCar(found)
 		}
 	}
 
 	if len(allFound) > 0 {
-		if deleteFiles {
+		if *deleteFiles {
 			log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
 		} else {
 			log.Printf("Run with -delete to save %s bytes.\n", humanize.Bytes(uint64(savedSize)))
@@ -105,7 +96,7 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 	for _, sideCarFilePath := range matches {
 		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
 			found = append(found, sideCarFilePath)
-			if runInline {
+			if *runInline {
 				removeSideCar(sideCarFilePath)
 			}
 		}
@@ -116,13 +107,13 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 func removeSideCar(sideCarFilePath string) {
 	if file, err := os.Stat(sideCarFilePath); err == nil {
 		savedSize += file.Size()
-		if deleteFiles {
+		if *deleteFiles {
 			log.Printf("Removing duplicate %s\n", sideCarFilePath)
 			if err := os.Remove(sideCarFilePath); err != nil {
 				log.Fatal(err)
 			}
 		} else {
-			if verboseMode || veryVerboseMode {
+			if *verboseMode || *veryVerboseMode {
 				log.Printf("Found duplicate %s\n", sideCarFilePath)
 			}
 		}
