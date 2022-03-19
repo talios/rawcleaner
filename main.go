@@ -20,6 +20,7 @@ var (
 	verboseMode     = kingpin.Flag("verbose", "Run in verbose mode.").Short('v').Bool()
 	veryVerboseMode = kingpin.Flag("very-verbose", "Run in VERY verbose mode.").Bool()
 	runInline       = kingpin.Flag("inline", "Run deletion process as we scan.").Bool()
+	includeHidden   = kingpin.Flag("hidden", "Include hidden files in scan.").Bool()
 	basePath        = kingpin.Arg("path", "Base path to scan.").Required().String()
 
 	savedSize int64
@@ -94,11 +95,16 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 		fmt.Println(err)
 	}
 	for _, sideCarFilePath := range matches {
-		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
-			found = append(found, sideCarFilePath)
-			if *runInline {
-				removeSideCar(sideCarFilePath)
+		isHidden := strings.HasPrefix(filepath.Base(sideCarFilePath), ".")
+		if isHidden && *includeHidden {
+			if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
+				found = append(found, sideCarFilePath)
+				if *runInline {
+					removeSideCar(sideCarFilePath)
+				}
 			}
+		} else {
+			log.Printf("Skipping hidden file %s\n", sideCarFilePath)
 		}
 	}
 	return found
