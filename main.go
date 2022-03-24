@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"io/fs"
-	"log"
+
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/dustin/go-humanize"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -29,38 +28,40 @@ var (
 func main() {
 	kingpin.Parse()
 
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
 	if !strings.HasSuffix(*basePath, "/") {
 		*basePath = *basePath + "/"
 	}
 
-	s := spinner.New(spinner.CharSets[9], 1024*time.Millisecond)
-	s.Start()
+	pathLogger := log.WithFields(log.Fields{"path": *basePath})
 
 	if *deleteFiles {
-		log.Println("WARN: raw-cleaner will delete files")
+		pathLogger.Warn("raw-cleaner will delete files")
 	}
 
 	fsys := os.DirFS(*basePath)
 
-	log.Println("Looking for raw files in " + *basePath)
+	pathLogger.Info("Looking for raw files")
 
 	allFound := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if isRawFile(p) {
 			if *veryVerboseMode {
-				log.Printf("Found %s%s\n", *basePath, p)
+				pathLogger.WithFields(log.Fields{"file": p}).Info("Found raw file")
 			}
-			found := findSideCarFiles(s, *basePath, p)
+			found := findSideCarFiles(*basePath, p)
 			allFound = append(allFound, found...)
-			s.Suffix = fmt.Sprintf("  : Found %d duplicates totalling %s", len(allFound), humanize.Bytes(uint64(savedSize)))
 		}
 		return nil
 	}); err != nil {
-		log.Printf("Walkdir returned error %v", err)
+		pathLogger.Fatalf("Walkdir returned error %v", err)
 	}
 
-	log.Printf("Found %d duplicate files.\n", len(allFound))
+	pathLogger.Infof("Found %d duplicate files.", len(allFound))
 
 	if !*runInline {
 		for _, found := range allFound {
@@ -69,23 +70,22 @@ func main() {
 	}
 
 	if len(allFound) > 0 {
+		foundLogger := pathLogger.WithFields(log.Fields{"bytes": humanize.Bytes(uint64(savedSize))})
 		if *deleteFiles {
-			log.Printf("Saved %s bytes.\n", humanize.Bytes(uint64(savedSize)))
+			foundLogger.Info("Saved bytes")
 		} else {
-			log.Printf("Run with -delete to save %s bytes.\n", humanize.Bytes(uint64(savedSize)))
+			foundLogger.Warn("Run with -delete to save %s bytes.")
 		}
 	}
-
-	s.Stop()
 
 }
 
 func isRawFile(filename string) bool {
-	match, _ := regexp.MatchString("\\.(raf|dmg)", strings.ToLower(filename))
+	match, _ := regexp.MatchString("\\.(raf|dmg)$", strings.ToLower(filename))
 	return match
 }
 
-func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []string {
+func findSideCarFiles(path string, filename string) []string {
 	found := []string{}
 
 	globPattern := fmt.Sprintf("%s/%s*", path, strings.TrimRight(filename, filepath.Ext(filename)))
@@ -95,32 +95,34 @@ func findSideCarFiles(spinner *spinner.Spinner, path string, filename string) []
 		fmt.Println(err)
 	}
 	for _, sideCarFilePath := range matches {
-		isHidden := strings.HasPrefix(filepath.Base(sideCarFilePath), ".")
-		if isHidden && *includeHidden {
-			if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
+		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
+			isHidden := strings.HasPrefix(filepath.Base(sideCarFilePath), ".")
+			if !isHidden || *includeHidden {
 				found = append(found, sideCarFilePath)
 				if *runInline {
 					removeSideCar(sideCarFilePath)
 				}
+
+			} else {
+				log.Warnf("Skipping hidden file %s", sideCarFilePath)
 			}
-		} else {
-			log.Printf("Skipping hidden file %s\n", sideCarFilePath)
 		}
 	}
 	return found
 }
 
 func removeSideCar(sideCarFilePath string) {
+	dupeLogger := log.WithFields(log.Fields{"file": sideCarFilePath})
 	if file, err := os.Stat(sideCarFilePath); err == nil {
 		savedSize += file.Size()
 		if *deleteFiles {
-			log.Printf("Removing duplicate %s\n", sideCarFilePath)
+			dupeLogger.Warn("Removing duplicate file")
 			if err := os.Remove(sideCarFilePath); err != nil {
 				log.Fatal(err)
 			}
 		} else {
 			if *verboseMode || *veryVerboseMode {
-				log.Printf("Found duplicate %s\n", sideCarFilePath)
+				dupeLogger.Warn("Found duplicate file")
 			}
 		}
 	}
