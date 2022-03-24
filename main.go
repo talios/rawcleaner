@@ -11,6 +11,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -30,11 +31,14 @@ func main() {
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
+		ForceQuote:    true,
 	})
 
 	if !strings.HasSuffix(*basePath, "/") {
 		*basePath = *basePath + "/"
 	}
+
+	fsys := os.DirFS(*basePath)
 
 	pathLogger := log.WithFields(log.Fields{"path": *basePath})
 
@@ -42,18 +46,27 @@ func main() {
 		pathLogger.Warn("raw-cleaner will delete files")
 	}
 
-	fsys := os.DirFS(*basePath)
-
-	pathLogger.Info("Looking for raw files")
+	pathLogger.Info("looking for raw files")
 
 	allFound := []string{}
+	allPaths := []string{}
 
 	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+
+		currPath := filepath.Dir(p)
+		if !slices.Contains(allPaths, currPath) {
+			pathLogger.WithFields(log.Fields{"subdir": currPath}).Info("checking subdir")
+			allPaths = append(allPaths, currPath)
+		}
+
 		if isRawFile(p) {
+			rawFile := fmt.Sprintf("%s/%s", *basePath, p)
+			rawLogger := log.WithFields(log.Fields{"rawfile": rawFile})
+
 			if *veryVerboseMode {
-				pathLogger.WithFields(log.Fields{"file": p}).Info("Found raw file")
+				rawLogger.Info("found raw file")
 			}
-			found := findSideCarFiles(*basePath, p)
+			found := findSideCarFiles(rawLogger, *basePath, p)
 			allFound = append(allFound, found...)
 		}
 		return nil
@@ -65,7 +78,7 @@ func main() {
 
 	if !*runInline {
 		for _, found := range allFound {
-			removeSideCar(found)
+			removeSideCar(pathLogger, found)
 		}
 	}
 
@@ -74,7 +87,7 @@ func main() {
 		if *deleteFiles {
 			foundLogger.Info("Saved bytes")
 		} else {
-			foundLogger.Warn("Run with -delete to save %s bytes.")
+			foundLogger.Warn("run with -delete to save %s bytes.")
 		}
 	}
 
@@ -85,7 +98,7 @@ func isRawFile(filename string) bool {
 	return match
 }
 
-func findSideCarFiles(path string, filename string) []string {
+func findSideCarFiles(logger *log.Entry, path string, filename string) []string {
 	found := []string{}
 
 	globPattern := fmt.Sprintf("%s/%s*", path, strings.TrimRight(filename, filepath.Ext(filename)))
@@ -100,30 +113,31 @@ func findSideCarFiles(path string, filename string) []string {
 			if !isHidden || *includeHidden {
 				found = append(found, sideCarFilePath)
 				if *runInline {
-					removeSideCar(sideCarFilePath)
+					removeSideCar(logger, sideCarFilePath)
 				}
 
 			} else {
-				log.Warnf("Skipping hidden file %s", sideCarFilePath)
+				logger.Warnf("skipping hidden file %s", sideCarFilePath)
 			}
 		}
 	}
 	return found
 }
 
-func removeSideCar(sideCarFilePath string) {
-	dupeLogger := log.WithFields(log.Fields{"file": sideCarFilePath})
+func removeSideCar(logger *log.Entry, sideCarFilePath string) {
+	dupeLogger := logger.WithFields(log.Fields{"sidecarfile": sideCarFilePath})
 	if file, err := os.Stat(sideCarFilePath); err == nil {
 		savedSize += file.Size()
 		if *deleteFiles {
-			dupeLogger.Warn("Removing duplicate file")
 			if err := os.Remove(sideCarFilePath); err != nil {
-				log.Fatal(err)
+				dupeLogger.Fatal(err)
 			}
+			dupeLogger.WithFields(log.Fields{"savedbytes": humanize.Bytes(uint64(savedSize))}).Warn("removed duplicate file")
 		} else {
 			if *verboseMode || *veryVerboseMode {
-				dupeLogger.Warn("Found duplicate file")
+				dupeLogger.Warn("found duplicate file")
 			}
 		}
 	}
+
 }
