@@ -12,6 +12,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mattn/go-colorable"
+	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	"github.com/snowzach/rotatefilehook"
 	"golang.org/x/exp/slices"
@@ -40,7 +41,9 @@ func main() {
 
 	fsys := os.DirFS(*basePath)
 
-	pathLogger := log.WithFields(log.Fields{"path": *basePath})
+	guid := xid.New()
+
+	pathLogger := log.WithFields(log.Fields{"path": *basePath, "xid": guid.String()})
 
 	if *deleteFiles {
 		pathLogger.Warn("raw-cleaner will delete files")
@@ -64,7 +67,7 @@ func main() {
 
 		if isRawFile(p) {
 			rawFile := fmt.Sprintf("%s/%s", *basePath, p)
-			rawLogger := log.WithFields(log.Fields{"rawfile": rawFile})
+			rawLogger := pathLogger.WithFields(log.Fields{"rawfile": rawFile})
 
 			if *veryVerboseMode {
 				rawLogger.Info("found raw file")
