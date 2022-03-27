@@ -5,12 +5,15 @@ import (
 	"io/fs"
 
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mattn/go-colorable"
 	log "github.com/sirupsen/logrus"
+	"github.com/snowzach/rotatefilehook"
 	"golang.org/x/exp/slices"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -29,10 +32,7 @@ var (
 func main() {
 	kingpin.Parse()
 
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-		ForceQuote:    true,
-	})
+	initLogger()
 
 	if !strings.HasSuffix(*basePath, "/") {
 		*basePath = *basePath + "/"
@@ -55,7 +55,10 @@ func main() {
 
 		currPath := filepath.Dir(p)
 		if !slices.Contains(allPaths, currPath) {
-			pathLogger.WithFields(log.Fields{"subdir": currPath}).Info("checking subdir")
+			pathLogger.WithFields(log.Fields{
+				"subdir":     currPath,
+				"savedbytes": humanize.Bytes(uint64(savedSize)),
+			}).Info("checking subdir")
 			allPaths = append(allPaths, currPath)
 		}
 
@@ -83,18 +86,62 @@ func main() {
 	}
 
 	if len(allFound) > 0 {
-		foundLogger := pathLogger.WithFields(log.Fields{"bytes": humanize.Bytes(uint64(savedSize))})
+		foundLogger := pathLogger.WithFields(log.Fields{"savedbytes": humanize.Bytes(uint64(savedSize))})
 		if *deleteFiles {
 			foundLogger.Info("Saved bytes")
 		} else {
-			foundLogger.Warn("run with -delete to save %s bytes.")
+			foundLogger.Warn("run with -delete to remove files.")
 		}
 	}
 
 }
 
+func initLogger() {
+	var logLevel = log.InfoLevel
+	var logfile string
+
+	currentUser, err := user.Current()
+
+	if err == nil {
+		logfile = currentUser.HomeDir + "/rawcleaner.log"
+	} else {
+		logfile = "rawcleaner.log"
+	}
+
+	rotateFileHook, err := rotatefilehook.NewRotateFileHook(rotatefilehook.RotateFileConfig{
+		Filename:   logfile,
+		MaxSize:    50, // megabytes
+		MaxBackups: 3,
+		MaxAge:     28, //days
+		Level:      logLevel,
+		Formatter:  &log.JSONFormatter{},
+	})
+
+	if err != nil {
+		log.Fatalf("Failed to initialize file rotate hook: %v", err)
+	}
+
+	log.SetOutput(colorable.NewColorableStdout())
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+		ForceQuote:    true,
+	})
+	log.AddHook(rotateFileHook)
+}
+
 func isRawFile(filename string) bool {
 	match, _ := regexp.MatchString("\\.(raf|dmg)$", strings.ToLower(filename))
+	return match
+}
+
+func isSideCarFile(filename string, sideCarFilePath string) bool {
+	computedSideCar := strings.ToLower(strings.TrimRight(filepath.Base(filename), filepath.Ext(filename)) + ".jpg")
+	return strings.ToLower(filepath.Base(sideCarFilePath)) == computedSideCar
+}
+
+func isDuplicateRawFile(filename string, sideCarFilePath string) bool {
+	rex := strings.ToLower(strings.TrimRight(filepath.Base(filename), filepath.Ext(filename)) + "-\\d+\\.raf")
+	match, _ := regexp.MatchString(rex, strings.ToLower(sideCarFilePath))
 	return match
 }
 
@@ -108,7 +155,12 @@ func findSideCarFiles(logger *log.Entry, path string, filename string) []string 
 		fmt.Println(err)
 	}
 	for _, sideCarFilePath := range matches {
-		if strings.ToLower(filepath.Ext(sideCarFilePath)) == ".jpg" {
+		if isDuplicateRawFile(filename, sideCarFilePath) {
+			logger.WithFields(log.Fields{"duplicaterawfile": sideCarFilePath}).Warn("duplicate raw file identified")
+		}
+
+		if isSideCarFile(filename, sideCarFilePath) {
+
 			isHidden := strings.HasPrefix(filepath.Base(sideCarFilePath), ".")
 			if !isHidden || *includeHidden {
 				found = append(found, sideCarFilePath)
