@@ -10,13 +10,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/alecthomas/kingpin"
 	"github.com/dustin/go-humanize"
 	"github.com/mattn/go-colorable"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	"github.com/snowzach/rotatefilehook"
 	"golang.org/x/exp/slices"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
@@ -58,10 +58,12 @@ func main() {
 
 		currPath := filepath.Dir(p)
 		if !slices.Contains(allPaths, currPath) {
-			pathLogger.WithFields(log.Fields{
-				"subdir":     currPath,
-				"savedbytes": humanize.Bytes(uint64(savedSize)),
-			}).Info("checking subdir")
+			if *verboseMode {
+				pathLogger.WithFields(log.Fields{
+					"subdir":     currPath,
+					"savedbytes": humanize.Bytes(uint64(savedSize)),
+				}).Info("checking subdir")
+			}
 			allPaths = append(allPaths, currPath)
 		}
 
