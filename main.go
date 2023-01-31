@@ -133,7 +133,7 @@ func initLogger() {
 }
 
 func isRawFile(filename string) bool {
-	match, _ := regexp.MatchString("\\.(raf|dmg)$", strings.ToLower(filename))
+	match, _ := regexp.MatchString("\\.(raf|dng)$", strings.ToLower(filename))
 	return match
 }
 
