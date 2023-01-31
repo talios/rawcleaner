@@ -138,7 +138,11 @@ func isRawFile(filename string) bool {
 }
 
 func isSideCarFile(filename string, sideCarFilePath string) bool {
-	computedSideCar := strings.ToLower(strings.TrimRight(filepath.Base(filename), filepath.Ext(filename)) + ".jpg")
+	return isSideCarFileForExt(filename, sideCarFilePath, ".jpg") || isSideCarFileForExt(filename, sideCarFilePath, ".jpeg")
+}
+
+func isSideCarFileForExt(filename string, sideCarFilePath string, ext string) bool {
+	computedSideCar := strings.ToLower(strings.TrimRight(filepath.Base(filename), filepath.Ext(filename)) + ext)
 	return strings.ToLower(filepath.Base(sideCarFilePath)) == computedSideCar
 }
 
@@ -163,7 +167,6 @@ func findSideCarFiles(logger *log.Entry, path string, filename string) []string 
 		}
 
 		if isSideCarFile(filename, sideCarFilePath) {
-
 			isHidden := strings.HasPrefix(filepath.Base(sideCarFilePath), ".")
 			if !isHidden || *includeHidden {
 				found = append(found, sideCarFilePath)
